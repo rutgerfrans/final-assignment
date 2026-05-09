@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import torch
 import gymnasium as gym
-from src.model import DQN, FrameStack, preprocess_without_graysscale
+from src.model import DQN, FrameStack, SkipFrame, preprocess_without_graysscale
 from src.config import STACK_N
 
 # run one episode and return the total reward
@@ -35,10 +35,11 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     render_mode = "human" if args.render else None
-    env = gym.make("CarRacing-v3", continuous=False, render_mode=render_mode)
+    env = SkipFrame(gym.make("CarRacing-v3", continuous=False, render_mode=render_mode), skip=4)
 
     net = DQN(n_actions=5).to(device)
-    net.load_state_dict(torch.load(args.model, map_location=device))
+    ckpt = torch.load(args.model, map_location=device, weights_only=True)
+    net.load_state_dict(ckpt['model'] if isinstance(ckpt, dict) and 'model' in ckpt else ckpt)
     net.eval()
 
     returns = []

@@ -2,7 +2,23 @@ import numpy as np
 import random
 import torch
 import torch.nn as nn
+import gymnasium as gym
 from collections import deque
+
+class SkipFrame(gym.Wrapper):
+    def __init__(self, env, skip):
+        super().__init__(env)
+        self._skip = skip
+
+    def step(self, action):
+        total_reward = 0.0
+        for _ in range(self._skip):
+            state, reward, terminated, truncated, info = self.env.step(action)
+            total_reward += reward
+            if terminated:
+                break
+        return state, total_reward, terminated, truncated, info
+
 
 # compress raw game frames for better network processing
     # bottom row of image is stripped (contains dashboard)
@@ -60,29 +76,58 @@ class DQN(nn.Module):
         x = self.conv(x).view(x.size(0), -1)
         return self.fc(x)
 
-# replay buffer for storing and sampling transitions during training
+# Stores individual raw frames in a ring buffer instead of full stacked states.
+# With stack_n=4 and 3-channel frames this uses ~8x less RAM than storing stacked states.
+# push() takes one new frame per step; stacks are reconstructed at sample time.
 class ReplayBuffer:
-    def __init__(self, capacity):
+    def __init__(self, capacity, stack_n=4, frame_shape=(3, 84, 96)):
         self.capacity = capacity
-        self.buffer = []
-        self.pos = 0
+        self.stack_n  = stack_n
+        self._n = capacity + stack_n          # frame ring needs a small headroom
+        self.frames     = np.zeros((self._n, *frame_shape), dtype=np.uint8)
+        self.actions    = np.zeros(capacity, dtype=np.int64)
+        self.rewards    = np.zeros(capacity, dtype=np.float32)
+        self.dones      = np.zeros(capacity, dtype=np.float32)
+        self.frame_ends = np.zeros(capacity, dtype=np.int32)  # last-frame index of each next_state
+        self.size      = 0
+        self.trans_pos = 0
+        self.frame_pos = 0
 
-    def push(self, state, action, reward, next_state, done):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.pos] = (state, action, reward, next_state, done)
-        self.pos = (self.pos + 1) % self.capacity
+    def reset_episode(self, init_frame):
+        """Seed the ring with stack_n copies of the initial frame at each episode start."""
+        for _ in range(self.stack_n):
+            self.frames[self.frame_pos] = init_frame
+            self.frame_pos = (self.frame_pos + 1) % self._n
+
+    def push(self, new_frame, action, reward, done):
+        self.frames[self.frame_pos]         = new_frame
+        self.frame_ends[self.trans_pos]     = self.frame_pos
+        self.actions[self.trans_pos]        = action
+        self.rewards[self.trans_pos]        = reward
+        self.dones[self.trans_pos]          = done
+        self.frame_pos = (self.frame_pos + 1) % self._n
+        self.trans_pos = (self.trans_pos + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
+
+    def _stack(self, last_idx, shift=0):
+        end = (last_idx - shift) % self._n
+        return np.concatenate(
+            [self.frames[(end - self.stack_n + 1 + i) % self._n] for i in range(self.stack_n)],
+            axis=0,
+        )
 
     def sample(self, batch_size, device):
-        batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
+        idxs        = np.random.choice(self.size, batch_size, replace=False)
+        ends        = self.frame_ends[idxs]
+        states      = np.stack([self._stack(e, shift=1) for e in ends])
+        next_states = np.stack([self._stack(e, shift=0) for e in ends])
         return (
-            torch.tensor(np.array(states), dtype=torch.uint8, device=device).float() / 255.0,
-            torch.tensor(actions, dtype=torch.int64, device=device),
-            torch.tensor(rewards, dtype=torch.float32, device=device),
-            torch.tensor(np.array(next_states), dtype=torch.uint8, device=device).float() / 255.0,
-            torch.tensor(dones, dtype=torch.float32, device=device),
+            torch.tensor(states,             dtype=torch.uint8, device=device).float() / 255.0,
+            torch.tensor(self.actions[idxs], dtype=torch.int64, device=device),
+            torch.tensor(self.rewards[idxs], dtype=torch.float32, device=device),
+            torch.tensor(next_states,        dtype=torch.uint8, device=device).float() / 255.0,
+            torch.tensor(self.dones[idxs],   dtype=torch.float32, device=device),
         )
 
     def __len__(self):
-        return len(self.buffer)
+        return self.size

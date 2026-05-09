@@ -1,13 +1,13 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
+WEIGHTS_DIR = Path(__file__).resolve().parent / "weights/dqn_rgb_carracing_weights"
 WEIGHTS_DIR.mkdir(exist_ok=True)
 
 # epsilon-greedy
 EPS_START     = 1.0
 EPS_END       = 0.05
-EPS_DECAY     = 200_000
+EPS_DECAY     = 150_000
 
 # training
 TRAIN_START   = 5_000
@@ -17,6 +17,7 @@ MAX_EPISODES  = 1_000
 GAMMA         = 0.99
 LR            = 1e-4
 BATCH_SIZE    = 32
-BUFFER_SIZE   = 10_000
+BUFFER_SIZE   = 300_000
 STACK_N       = 4
-PRE_TRAINED   = True
+PRE_TRAINED   = False    
+DOUBLE_DQN    = False
