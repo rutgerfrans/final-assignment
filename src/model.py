@@ -24,10 +24,10 @@ class SkipFrame(gym.Wrapper):
     # bottom row of image is stripped (contains dashboard)
     # grayscaling (color might not carry useful information) want to focus on shapes and edges, reduces number of channels
     # normalizing pixel values to [0, 1] for stable training
-def preprocess(obs):
-    # (96, 96, 3) uint8 -> (84, 96) float32 grayscale, drops bottom indicator strip
+def preprocess_grayscale(obs):
+    # (96, 96, 3) uint8 -> (1, 84, 96) uint8, drops bottom indicator strip
     gray = 0.2989 * obs[:84, :, 0] + 0.5870 * obs[:84, :, 1] + 0.1140 * obs[:84, :, 2]
-    return gray.astype(np.float32) / 255.0
+    return gray.astype(np.uint8)[np.newaxis]
 
 def preprocess_without_graysscale(obs):
     # (96, 96, 3) uint8 -> (3, 84, 96) uint8, drops bottom indicator strip
@@ -54,22 +54,22 @@ class FrameStack:
 # with 3 convolutional layers followed by 2 fully connected layers.
 # Made with PyTorch's nn.Module. https://pytorch.org/docs/stable/generated/torch.nn.Module.html
 class DQN(nn.Module):
-    def __init__(self, n_actions):
+    def __init__(self, n_actions, in_channels=12):
         super().__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(12, 32, kernel_size=8, stride=4), nn.ReLU(),
+            nn.Conv2d(in_channels, 32, kernel_size=8, stride=4), nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2), nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, stride=1), nn.ReLU(),
         )
-        conv_out = self._conv_out_size()
+        conv_out = self._conv_out_size(in_channels)
         self.fc = nn.Sequential(
             nn.Linear(conv_out, 512), nn.ReLU(),
             nn.Linear(512, n_actions),
         )
 
-    def _conv_out_size(self):
+    def _conv_out_size(self, in_channels):
         with torch.no_grad():
-            dummy = torch.zeros(1, 12, 84, 96)
+            dummy = torch.zeros(1, in_channels, 84, 96)
             return self.conv(dummy).view(1, -1).shape[1]
 
     def forward(self, x):

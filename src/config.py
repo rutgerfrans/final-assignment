@@ -1,7 +1,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS_DIR = Path(__file__).resolve().parent / "weights/dqn_rgb_carracing_weights"
+WEIGHTS_DIR = Path(__file__).resolve().parent / "weights/double_dqn_grayscale_carracing_weights"
 WEIGHTS_DIR.mkdir(exist_ok=True)
 
 # epsilon-greedy
@@ -19,5 +19,6 @@ LR            = 1e-4
 BATCH_SIZE    = 32
 BUFFER_SIZE   = 300_000
 STACK_N       = 4
-PRE_TRAINED   = False    
-DOUBLE_DQN    = False
+PRE_TRAINED   = False
+DOUBLE_DQN    = True
+GRAYSCALE     = True

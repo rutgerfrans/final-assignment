@@ -5,10 +5,10 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import gymnasium as gym
-from src.model import DQN, ReplayBuffer, FrameStack, SkipFrame, preprocess_without_graysscale
+from src.model import DQN, ReplayBuffer, FrameStack, SkipFrame, preprocess_grayscale, preprocess_without_graysscale
 from src.config import (ROOT, WEIGHTS_DIR, EPS_START, EPS_END, EPS_DECAY, TRAIN_START,
                         TARGET_UPDATE, SAVE_EVERY, MAX_EPISODES, GAMMA,
-                        LR, BATCH_SIZE, BUFFER_SIZE, STACK_N, PRE_TRAINED, DOUBLE_DQN)
+                        LR, BATCH_SIZE, BUFFER_SIZE, STACK_N, PRE_TRAINED, DOUBLE_DQN, GRAYSCALE)
 
 PLOTS_DIR = WEIGHTS_DIR.parent.parent / "plots"
 PLOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,7 +72,7 @@ def save_return_plot(episode_numbers, returns, checkpoint_episode, double_dqn: b
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    variant_tag = "ddqn" if double_dqn else "dqn"
+    variant_tag = ("ddqn" if double_dqn else "dqn") + ("_gray" if GRAYSCALE else "_rgb")
     path = PLOTS_DIR / f"returns_{variant_tag}_ep{checkpoint_episode:04d}.png"
     fig.savefig(path, dpi=120)
     plt.close("all")
@@ -82,11 +82,25 @@ def save_return_plot(episode_numbers, returns, checkpoint_episode, double_dqn: b
 # training
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device} | Double DQN: {DOUBLE_DQN}")
+    preprocess_fn = preprocess_grayscale if GRAYSCALE else preprocess_without_graysscale
+    frame_shape   = (1, 84, 96) if GRAYSCALE else (3, 84, 96)
+    in_channels   = STACK_N * (1 if GRAYSCALE else 3)
+    print(
+        f"\n{'='*52}\n"
+        f"  Device      : {device}\n"
+        f"  Mode        : {'Double DQN' if DOUBLE_DQN else 'DQN'}\n"
+        f"  Input       : {'Grayscale (1ch)' if GRAYSCALE else 'RGB (3ch)'}\n"
+        f"  Episodes    : {MAX_EPISODES}  |  Batch: {BATCH_SIZE}  |  Buffer: {BUFFER_SIZE:,}\n"
+        f"  LR          : {LR}  |  Gamma: {GAMMA}  |  Stack: {STACK_N}\n"
+        f"  Eps         : {EPS_START} -> {EPS_END} over {EPS_DECAY:,} steps\n"
+        f"  Target upd  : every {TARGET_UPDATE:,} steps\n"
+        f"  Pretrained  : {PRE_TRAINED}\n"
+        f"{'='*52}\n"
+    )
 
     env = make_env()
-    policy_net = DQN(n_actions=5).to(device) # network that learns to predict Q-values
-    target_net = DQN(n_actions=5).to(device) # target network that provides stable Q-value targets for training the policy network
+    policy_net = DQN(n_actions=5, in_channels=in_channels).to(device) # network that learns to predict Q-values
+    target_net = DQN(n_actions=5, in_channels=in_channels).to(device) # target network that provides stable Q-value targets for training the policy network
 
     checkpoints = sorted(glob.glob(str(WEIGHTS_DIR / "dqn_ep*.pt")), key=os.path.getmtime)
     total_steps = 0
@@ -113,13 +127,13 @@ def train():
     target_net.eval()
 
     optimizer = torch.optim.Adam(policy_net.parameters(), lr=LR) # TODO: Experiment with different optimizers
-    buffer = ReplayBuffer(BUFFER_SIZE, stack_n=STACK_N)
+    buffer = ReplayBuffer(BUFFER_SIZE, stack_n=STACK_N, frame_shape=frame_shape)
     frame_stack = FrameStack(STACK_N)
 
     for episode in range(start_episode, MAX_EPISODES + 1):
         # initialize the episode
         obs, _ = env.reset()
-        init_frame = preprocess_without_graysscale(obs)
+        init_frame = preprocess_fn(obs)
         frame_stack.reset(init_frame)
         buffer.reset_episode(init_frame)
         state = frame_stack.get()
@@ -137,7 +151,7 @@ def train():
             done = terminated or truncated
 
             # store transition in stack and replay buffer and update state
-            new_frame = preprocess_without_graysscale(next_obs)
+            new_frame = preprocess_fn(next_obs)
             frame_stack.push(new_frame)
             next_state = frame_stack.get()
             buffer.push(new_frame, action, reward, float(done))
