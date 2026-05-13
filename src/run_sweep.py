@@ -6,12 +6,8 @@ so the script is restartable.
 import time
 from pathlib import Path
 
-from src.config import MAX_EPISODES, make_config
+from src.config import MAX_EPISODES, SEEDS, VARIANTS, make_config
 from src.train import train
-
-
-VARIANTS = [(double_dqn, grayscale) for double_dqn in [False, True] for grayscale in [True, False]]
-SEEDS = [0]
 
 
 # True iff the csv has at least header + expected data rows

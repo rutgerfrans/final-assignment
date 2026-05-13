@@ -9,10 +9,10 @@ EPS_END       = 0.05
 EPS_DECAY     = 150_000
 
 # training
-TRAIN_START   = 200 #was 5_000
+TRAIN_START   = 200 #5_000
 TARGET_UPDATE = 1_000
 SAVE_EVERY    = 10
-MAX_EPISODES  = 10 #was 1_000
+MAX_EPISODES  = 10 #1_000
 GAMMA         = 0.99
 LR            = 1e-4
 BATCH_SIZE    = 32
@@ -22,11 +22,19 @@ PRE_TRAINED   = False
 DOUBLE_DQN    = True
 GRAYSCALE     = True
 
+# sweep grid — variants to train and seeds per variant
+VARIANTS = [(False, True), (False, False), (True, True), (True, False)]
+SEEDS    = [0]
+
+
+def variant_name(double_dqn: bool, grayscale: bool) -> str:
+    return ("ddqn" if double_dqn else "dqn") + ("_gray" if grayscale else "_rgb")
+
 
 # build a full run config dict from variant + seed; paths derived from variant_name
 def make_config(double_dqn: bool, grayscale: bool, seed: int) -> dict:
-    variant_name = ("ddqn" if double_dqn else "dqn") + ("_gray" if grayscale else "_rgb")
-    run_dir = RUNS_DIR / f"{variant_name}_seed{seed}"
+    name = variant_name(double_dqn, grayscale)
+    run_dir = RUNS_DIR / f"{name}_seed{seed}"
     return {
         "EPS_START":     EPS_START,
         "EPS_END":       EPS_END,
@@ -44,7 +52,7 @@ def make_config(double_dqn: bool, grayscale: bool, seed: int) -> dict:
         "DOUBLE_DQN":    double_dqn,
         "GRAYSCALE":     grayscale,
         "seed":          seed,
-        "variant_name":  variant_name,
+        "variant_name":  name,
         "run_dir":       str(run_dir),
         "weights_dir":   str(run_dir / "weights"),
         "plots_dir":     str(run_dir / "plots"),

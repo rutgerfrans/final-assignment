@@ -4,24 +4,22 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.config import RUNS_DIR
+from src.config import RUNS_DIR, SEEDS, VARIANTS, variant_name
 
 
-VARIANTS = ["dqn_gray", "dqn_rgb", "ddqn_gray", "ddqn_rgb"]
-SEEDS    = [0]
 AGG_DIR  = RUNS_DIR / "aggregate"
 ROLL_W   = 100
 DUR_W    = 50
 
 
-def variant_title(v):
-    algo = "Double DQN" if v.startswith("ddqn") else "DQN"
-    inp  = "grayscale" if v.endswith("gray") else "RGB"
+def variant_title(double_dqn, grayscale):
+    algo = "Double DQN" if double_dqn else "DQN"
+    inp  = "grayscale" if grayscale else "RGB"
     return f"{algo} ({inp})"
 
 
-def load_run(variant, seed):
-    path = RUNS_DIR / f"{variant}_seed{seed}" / "episodes.csv"
+def load_run(name, seed):
+    path = RUNS_DIR / f"{name}_seed{seed}" / "episodes.csv"
     with open(path) as f:
         rows = list(csv.DictReader(f))
     returns = np.array([float(r["return"]) for r in rows], dtype=np.float64)
@@ -40,8 +38,9 @@ def main():
     AGG_DIR.mkdir(parents=True, exist_ok=True)
 
     # load everything first so window sizes can clamp to actual data length
-    loaded = {v: [load_run(v, s) for s in SEEDS] for v in VARIANTS}
-    n = min(len(r) for v in VARIANTS for r, _ in loaded[v])
+    loaded = {variant_name(d, g): [load_run(variant_name(d, g), s) for s in SEEDS]
+              for d, g in VARIANTS}
+    n = min(len(r) for runs in loaded.values() for r, _ in runs)
     roll_w  = min(ROLL_W, n)
     dur_w   = min(DUR_W, n)
     final_n = min(100, n)
@@ -51,26 +50,28 @@ def main():
     per_variant_dur     = {}   # mean per-episode duration over training
     per_variant_totals  = {}   # total runtime per seed
 
-    for v in VARIANTS:
-        returns_arr = np.stack([r[:n] for r, _ in loaded[v]])
+    for d, g in VARIANTS:
+        name = variant_name(d, g)
+        runs = loaded[name]
+        returns_arr = np.stack([r[:n] for r, _ in runs])
         # first episode's duration is wall[0]; subsequent are diffs
-        dur_arr     = np.stack([np.diff(w[:n], prepend=0.0) for _, w in loaded[v]])
-        totals      = np.array([w[n - 1] for _, w in loaded[v]])
+        dur_arr     = np.stack([np.diff(w[:n], prepend=0.0) for _, w in runs])
+        totals      = np.array([w[n - 1] for _, w in runs])
 
         roll_per_seed = np.stack([rolling_mean(returns_arr[i], roll_w) for i in range(len(returns_arr))])
         roll_mean = roll_per_seed.mean(axis=0)
         roll_std  = roll_per_seed.std(axis=0)
-        per_variant_roll[v] = (roll_mean, roll_std)
+        per_variant_roll[name] = (roll_mean, roll_std)
 
         dur_roll = np.stack([rolling_mean(dur_arr[i], dur_w) for i in range(len(dur_arr))])
-        per_variant_dur[v] = dur_roll.mean(axis=0)
-        per_variant_totals[v] = totals
+        per_variant_dur[name] = dur_roll.mean(axis=0)
+        per_variant_totals[name] = totals
 
         final_per_seed = returns_arr[:, -final_n:].mean(axis=1)
         best_per_seed  = roll_per_seed.max(axis=1)
         ep_dur_per_seed = dur_arr.mean(axis=1)
         summary_rows.append({
-            "variant": v,
+            "variant": name,
             "final_return_mean":      float(final_per_seed.mean()),
             "final_return_std":       float(final_per_seed.std()),
             "best_rolling_return_mean": float(best_per_seed.mean()),
@@ -89,19 +90,19 @@ def main():
         ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
         ax.set_xlabel("Episode")
         ax.set_ylabel("Rolling return")
-        ax.set_title(f"{variant_title(v)} — return across {len(SEEDS)} seeds")
+        ax.set_title(f"{variant_title(d, g)} — return across {len(SEEDS)} seeds")
         ax.legend()
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
-        fig.savefig(AGG_DIR / f"{v}_returns.png", dpi=120)
+        fig.savefig(AGG_DIR / f"{name}_returns.png", dpi=120)
         plt.close(fig)
 
     # combined plot — mean lines only for legibility
     fig, ax = plt.subplots(figsize=(10, 4))
-    for v in VARIANTS:
-        roll_mean, _ = per_variant_roll[v]
+    for d, g in VARIANTS:
+        roll_mean, _ = per_variant_roll[variant_name(d, g)]
         x = np.arange(roll_w, roll_w + len(roll_mean))
-        ax.plot(x, roll_mean, linewidth=1.8, label=variant_title(v))
+        ax.plot(x, roll_mean, linewidth=1.8, label=variant_title(d, g))
     ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
     ax.set_xlabel("Episode")
     ax.set_ylabel(f"Rolling return (w={roll_w})")
@@ -114,10 +115,10 @@ def main():
 
     # per-episode runtime over training
     fig, ax = plt.subplots(figsize=(10, 4))
-    for v in VARIANTS:
-        dur = per_variant_dur[v]
+    for d, g in VARIANTS:
+        dur = per_variant_dur[variant_name(d, g)]
         x = np.arange(dur_w, dur_w + len(dur))
-        ax.plot(x, dur, linewidth=1.5, label=variant_title(v))
+        ax.plot(x, dur, linewidth=1.5, label=variant_title(d, g))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Per-episode duration (s)")
     ax.set_title(f"Per-episode runtime across seeds (rolling w={dur_w})")
@@ -129,9 +130,9 @@ def main():
 
     # total runtime bar chart
     fig, ax = plt.subplots(figsize=(8, 4))
-    means_min = [per_variant_totals[v].mean() / 60 for v in VARIANTS]
-    stds_min  = [per_variant_totals[v].std()  / 60 for v in VARIANTS]
-    labels    = [variant_title(v) for v in VARIANTS]
+    means_min = [per_variant_totals[variant_name(d, g)].mean() / 60 for d, g in VARIANTS]
+    stds_min  = [per_variant_totals[variant_name(d, g)].std()  / 60 for d, g in VARIANTS]
+    labels    = [variant_title(d, g) for d, g in VARIANTS]
     ax.bar(labels, means_min, yerr=stds_min, capsize=6, color="steelblue", alpha=0.85)
     ax.set_ylabel("Total training time (min)")
     ax.set_title("Total runtime per variant (mean ± std across seeds)")
