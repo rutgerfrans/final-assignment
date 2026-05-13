@@ -9,10 +9,10 @@ EPS_END       = 0.05
 EPS_DECAY     = 150_000
 
 # training
-TRAIN_START   = 200 #5_000
+TRAIN_START   = 5_000
 TARGET_UPDATE = 1_000
 SAVE_EVERY    = 10
-MAX_EPISODES  = 10 #1_000
+MAX_EPISODES  = 1_000
 GAMMA         = 0.99
 LR            = 1e-4
 BATCH_SIZE    = 32
