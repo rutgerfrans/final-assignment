@@ -1,4 +1,6 @@
 import argparse
+import json
+from pathlib import Path
 import numpy as np
 import torch
 import gymnasium as gym
@@ -6,9 +8,9 @@ from src.model import DQN, FrameStack, SkipFrame, preprocess_grayscale, preproce
 from src.config import STACK_N, GRAYSCALE
 
 # run one episode and return the total reward
-def run_episode(env, net, device, preprocess_fn):
+def run_episode(env, net, device, preprocess_fn, stack_n):
     obs, _ = env.reset()
-    frame_stack = FrameStack(STACK_N)
+    frame_stack = FrameStack(stack_n)
     frame_stack.reset(preprocess_fn(obs))
     total_return = 0.0
     done = False
@@ -25,17 +27,36 @@ def run_episode(env, net, device, preprocess_fn):
 
     return total_return
 
+# look for a sibling config.json so we know the input mode the checkpoint was trained on
+def resolve_run_config(model_path):
+    p = Path(model_path).resolve()
+    for d in (p.parent, p.parent.parent):
+        cfg_path = d / "config.json"
+        if cfg_path.exists():
+            with open(cfg_path) as f:
+                return json.load(f)
+    return None
+
 # evaluate a trained model
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, help="path to .pt checkpoint")
+    parser.add_argument("--config", default=None, help="optional path to run config.json (auto-detected if omitted)")
     parser.add_argument("--episodes", type=int, default=5)
     parser.add_argument("--render", action="store_true")
     args = parser.parse_args()
 
+    if args.config:
+        with open(args.config) as f:
+            cfg = json.load(f)
+    else:
+        cfg = resolve_run_config(args.model)
+    grayscale = cfg["GRAYSCALE"] if cfg else GRAYSCALE
+    stack_n   = cfg["STACK_N"]   if cfg else STACK_N
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    preprocess_fn = preprocess_grayscale if GRAYSCALE else preprocess_without_graysscale
-    in_channels   = STACK_N * (1 if GRAYSCALE else 3)
+    preprocess_fn = preprocess_grayscale if grayscale else preprocess_without_graysscale
+    in_channels   = stack_n * (1 if grayscale else 3)
     render_mode = "human" if args.render else None
     env = SkipFrame(gym.make("CarRacing-v3", continuous=False, render_mode=render_mode), skip=4)
 
@@ -46,7 +67,7 @@ def main():
 
     returns = []
     for i in range(args.episodes):
-        r = run_episode(env, net, device, preprocess_fn)
+        r = run_episode(env, net, device, preprocess_fn, stack_n)
         returns.append(r)
         print(f"Episode {i + 1}: {r:.1f}")
 

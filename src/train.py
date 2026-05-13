@@ -1,17 +1,15 @@
-import glob
-import os
+import csv
+import json
 import random
+import time
+from pathlib import Path
+import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import gymnasium as gym
 from src.model import DQN, ReplayBuffer, FrameStack, SkipFrame, preprocess_grayscale, preprocess_without_graysscale
-from src.config import (ROOT, WEIGHTS_DIR, EPS_START, EPS_END, EPS_DECAY, TRAIN_START,
-                        TARGET_UPDATE, SAVE_EVERY, MAX_EPISODES, GAMMA,
-                        LR, BATCH_SIZE, BUFFER_SIZE, STACK_N, PRE_TRAINED, DOUBLE_DQN, GRAYSCALE)
-
-PLOTS_DIR = WEIGHTS_DIR.parent.parent / "plots"
-PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+from src.config import GAMMA, DOUBLE_DQN, GRAYSCALE, make_config
 
 
 # I got the environment from Gymnasium
@@ -49,7 +47,7 @@ def compute_loss(batch, policy_net, target_net, double_dqn: bool):
     return nn.functional.mse_loss(q_vals, targets)
 
 # helper function for plotting
-def save_return_plot(episode_numbers, returns, checkpoint_episode, double_dqn: bool):
+def save_return_plot(episode_numbers, returns, double_dqn: bool, grayscale: bool, path):
     window = max(1, len(returns) // 10)
     rolling = None
     if len(returns) >= window:
@@ -67,83 +65,118 @@ def save_return_plot(episode_numbers, returns, checkpoint_episode, double_dqn: b
     ax.set_xlabel("Episode")
     ax.set_ylabel("Return")
     variant = "Double DQN" if double_dqn else "DQN"
-    ax.set_title(f"{variant} CarRacing-v3 — returns up to episode {checkpoint_episode}")
+    colortype = "grayscale" if grayscale else "RGB"
+    ax.set_title(f"{variant} CarRacing-v3 ({colortype}) — returns up to episode {episode_numbers[-1]}")
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-
-    variant_tag = ("ddqn" if double_dqn else "dqn") + ("_gray" if GRAYSCALE else "_rgb")
-    path = PLOTS_DIR / f"returns_{variant_tag}_ep{checkpoint_episode:04d}.png"
     fig.savefig(path, dpi=120)
     plt.close("all")
-    print(f"  -> Plot saved to {path.relative_to(ROOT)}")
 
 
 # training
-def train():
+def train(cfg: dict):
+    seed = cfg["seed"]
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    preprocess_fn = preprocess_grayscale if GRAYSCALE else preprocess_without_graysscale
-    frame_shape   = (1, 84, 96) if GRAYSCALE else (3, 84, 96)
-    in_channels   = STACK_N * (1 if GRAYSCALE else 3)
+    grayscale  = cfg["GRAYSCALE"]
+    double_dqn = cfg["DOUBLE_DQN"]
+    stack_n    = cfg["STACK_N"]
+    preprocess_fn = preprocess_grayscale if grayscale else preprocess_without_graysscale
+    frame_shape   = (1, 84, 96) if grayscale else (3, 84, 96)
+    in_channels   = stack_n * (1 if grayscale else 3)
+
+    weights_dir = Path(cfg["weights_dir"])
+    plots_dir   = Path(cfg["plots_dir"])
+    csv_path    = Path(cfg["csv_path"])
+    weights_dir.mkdir(parents=True, exist_ok=True)
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(cfg["config_path"], "w") as f:
+        json.dump(cfg, f, indent=2)
+
     print(
         f"\n{'='*52}\n"
+        f"  Variant     : {cfg['variant_name']}  (seed {seed})\n"
         f"  Device      : {device}\n"
-        f"  Mode        : {'Double DQN' if DOUBLE_DQN else 'DQN'}\n"
-        f"  Input       : {'Grayscale (1ch)' if GRAYSCALE else 'RGB (3ch)'}\n"
-        f"  Episodes    : {MAX_EPISODES}  |  Batch: {BATCH_SIZE}  |  Buffer: {BUFFER_SIZE:,}\n"
-        f"  LR          : {LR}  |  Gamma: {GAMMA}  |  Stack: {STACK_N}\n"
-        f"  Eps         : {EPS_START} -> {EPS_END} over {EPS_DECAY:,} steps\n"
-        f"  Target upd  : every {TARGET_UPDATE:,} steps\n"
-        f"  Pretrained  : {PRE_TRAINED}\n"
+        f"  Input       : {'Grayscale (1ch)' if grayscale else 'RGB (3ch)'}\n"
+        f"  Episodes    : {cfg['MAX_EPISODES']}  |  Batch: {cfg['BATCH_SIZE']}  |  Buffer: {cfg['BUFFER_SIZE']:,}\n"
+        f"  LR          : {cfg['LR']}  |  Gamma: {cfg['GAMMA']}  |  Stack: {stack_n}\n"
+        f"  Eps         : {cfg['EPS_START']} -> {cfg['EPS_END']} over {cfg['EPS_DECAY']:,} steps\n"
+        f"  Target upd  : every {cfg['TARGET_UPDATE']:,} steps\n"
         f"{'='*52}\n"
     )
 
     env = make_env()
+    env.action_space.seed(seed)
+
     policy_net = DQN(n_actions=5, in_channels=in_channels).to(device) # network that learns to predict Q-values
     target_net = DQN(n_actions=5, in_channels=in_channels).to(device) # target network that provides stable Q-value targets for training the policy network
-
-    checkpoints = sorted(glob.glob(str(WEIGHTS_DIR / "dqn_ep*.pt")), key=os.path.getmtime)
-    total_steps = 0
-    start_episode = 1
-    episode_numbers = []
-    all_returns = []
-
-    if checkpoints and PRE_TRAINED:
-        print(f"Resuming from {checkpoints[-1]}")
-        ckpt = torch.load(checkpoints[-1], map_location=device, weights_only=True)
-        if isinstance(ckpt, dict) and 'model' in ckpt:
-            policy_net.load_state_dict(ckpt['model'])
-            total_steps = ckpt['total_steps']
-        else:
-            policy_net.load_state_dict(ckpt)
-            try:
-                ep = int(os.path.basename(checkpoints[-1]).replace('dqn_ep', '').replace('.pt', ''))
-                total_steps = (ep - 1) * 1000
-                start_episode = ep + 1
-            except ValueError:
-                pass
-
     target_net.load_state_dict(policy_net.state_dict())
     target_net.eval()
 
-    optimizer = torch.optim.Adam(policy_net.parameters(), lr=LR) # TODO: Experiment with different optimizers
-    buffer = ReplayBuffer(BUFFER_SIZE, stack_n=STACK_N, frame_shape=frame_shape)
-    frame_stack = FrameStack(STACK_N)
+    optimizer = torch.optim.Adam(policy_net.parameters(), lr=cfg["LR"]) # TODO: Experiment with different optimizers
+    buffer = ReplayBuffer(cfg["BUFFER_SIZE"], stack_n=stack_n, frame_shape=frame_shape)
+    frame_stack = FrameStack(stack_n)
 
-    for episode in range(start_episode, MAX_EPISODES + 1):
+    eps_start  = cfg["EPS_START"]
+    eps_end    = cfg["EPS_END"]
+    eps_decay  = cfg["EPS_DECAY"]
+    train_start   = cfg["TRAIN_START"]
+    target_update = cfg["TARGET_UPDATE"]
+    save_every    = cfg["SAVE_EVERY"]
+    max_episodes  = cfg["MAX_EPISODES"]
+    batch_size    = cfg["BATCH_SIZE"]
+
+    total_steps = 0
+    episode_numbers = []
+    all_returns = []
+    start_time = time.time()
+    first_reset = True
+
+    # warm start from the most recent checkpoint in this run's weights dir
+    if cfg["PRE_TRAINED"] and weights_dir.exists():
+        ckpts = sorted(weights_dir.glob("*.pt"), key=lambda p: p.stat().st_mtime)
+        if ckpts:
+            print(f"Resuming from {ckpts[-1]}")
+            ckpt = torch.load(ckpts[-1], map_location=device, weights_only=True)
+            if isinstance(ckpt, dict) and 'model' in ckpt:
+                policy_net.load_state_dict(ckpt['model'])
+                total_steps = ckpt.get('total_steps', 0)
+            else:
+                policy_net.load_state_dict(ckpt)
+            target_net.load_state_dict(policy_net.state_dict())
+
+    csv_file = open(csv_path, "w", newline="")
+    writer = csv.writer(csv_file)
+    writer.writerow(["episode", "return", "epsilon_end", "total_steps",
+                     "wall_clock_seconds", "loss_mean", "loss_count"])
+
+    for episode in range(1, max_episodes + 1):
         # initialize the episode
-        obs, _ = env.reset()
+        if first_reset:
+            obs, _ = env.reset(seed=seed)
+            first_reset = False
+        else:
+            obs, _ = env.reset()
         init_frame = preprocess_fn(obs)
         frame_stack.reset(init_frame)
         buffer.reset_episode(init_frame)
         state = frame_stack.get()
         episode_return = 0.0
         done = False
-        eps = EPS_START
+        eps = eps_start
+        loss_sum = 0.0
+        loss_count = 0
 
         while not done:
             # decay eps and get action from policy
-            eps = max(EPS_END, EPS_START - (EPS_START - EPS_END) * total_steps / EPS_DECAY)
+            eps = max(eps_end, eps_start - (eps_start - eps_end) * total_steps / eps_decay)
             action = select_action(state, eps, policy_net, device)
 
             # get next state from chosen action
@@ -160,31 +193,45 @@ def train():
             total_steps += 1
 
             # updates policy network after the buffer is "warm"
-            if len(buffer) >= TRAIN_START:
-                batch = buffer.sample(BATCH_SIZE, device)
-                loss = compute_loss(batch, policy_net, target_net, DOUBLE_DQN)
+            if len(buffer) >= train_start:
+                batch = buffer.sample(batch_size, device)
+                loss = compute_loss(batch, policy_net, target_net, double_dqn)
                 optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(policy_net.parameters(), 10)
                 optimizer.step()
+                loss_sum += loss.item()
+                loss_count += 1
 
             # updates target network
-            if total_steps % TARGET_UPDATE == 0:
+            if total_steps % target_update == 0:
                 target_net.load_state_dict(policy_net.state_dict())
 
         episode_numbers.append(episode)
         all_returns.append(episode_return)
+        wall = time.time() - start_time
+        loss_mean = (loss_sum / loss_count) if loss_count > 0 else 0.0
         print(f"Ep {episode:4d} | Return {episode_return:8.1f} | Eps {eps:.3f} | Steps {total_steps}")
+        writer.writerow([episode, episode_return, eps, total_steps, wall, loss_mean, loss_count])
+        csv_file.flush()
 
-        if episode % SAVE_EVERY == 0:
+        # sparse milestone checkpoints
+        if episode in (500, 1000):
             torch.save({'model': policy_net.state_dict(), 'total_steps': total_steps},
-                       str(WEIGHTS_DIR / f"dqn_ep{episode}.pt"))
-            print(f"  -> Saved dqn_ep{episode}.pt")
-            save_return_plot(episode_numbers, all_returns, episode, DOUBLE_DQN)
+                       str(weights_dir / f"episode_{episode}.pt"))
 
-    torch.save(policy_net.state_dict(), str(WEIGHTS_DIR / "dqn_final.pt"))
+        # progress plot — overwrite a single file so partial runs are monitorable
+        if episode % save_every == 0:
+            save_return_plot(episode_numbers, all_returns, double_dqn, grayscale,
+                             plots_dir / "returns_latest.png")
+
+    save_return_plot(episode_numbers, all_returns, double_dqn, grayscale,
+                     plots_dir / "returns_final.png")
+    torch.save({'model': policy_net.state_dict(), 'total_steps': total_steps},
+               str(weights_dir / "final.pt"))
+    csv_file.close()
     env.close()
 
 
 if __name__ == "__main__":
-    train()
+    train(make_config(DOUBLE_DQN, GRAYSCALE, seed=0))
