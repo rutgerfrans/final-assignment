@@ -1,5 +1,7 @@
 # Reinforcement Learning - Final Assignment
 
+## Maybe it is better to train Race Cars with RGB colors?
+
 Rutger de Groen - i6297772
 
 ## 1. Introduction
@@ -64,7 +66,7 @@ Other than that most of the configuration parameters are inspired by online work
 
 For each configuration the output returns and Runtime, were logged, saved as csv, and plotted.
 
-All configurations where ran on a Desktop PC, with 32 GB of RAM, a GTX1070 (please sponsor me, I would love to have better GPU), and a AMD Ryzen 5 (DOUBLE CHECK).
+All configurations where ran on a Desktop PC, with 32 GB of RAM, a GTX1070 (please sponsor me, I would love to have better GPU), and AMD Ryzen 5 3600 6-core processor × 12.
 
 ## 5. Results
 
