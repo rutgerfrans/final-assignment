@@ -24,7 +24,7 @@ GRAYSCALE     = True
 
 # sweep grid — variants to train and seeds per variant
 VARIANTS = [(False, True), (False, False), (True, True), (True, False)]
-SEEDS    = [0]
+SEEDS    = [0,1,2]
 
 
 def variant_name(double_dqn: bool, grayscale: bool) -> str:
