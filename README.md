@@ -106,9 +106,17 @@ The plots above show the mean rolling returns for each variant seperately. Here 
 
 These plots show a clear difference in runtime between the RGB and Grayscale variants. RGB clearly takes longer than Grayscale. Total runtimes show that the variants with RGB take roughly 10-15 minutes longer than the grayscale variants. The per episode plot shows that with an overall increasing runtime per episode the difference does not change around 1.5 seconds.
 
+## 5.5 Demo
+
+- insert GIF
+
 ## 6. Discussion
 
 - explain why resultls are like this. interpret them.
+- 5.1/5.2 why does Double DQN perform bad on grayscaling but well on rgb?
+- 5.1 why does rgb perform better over the same amount of episodes?
+- 5.2 why does rgb have less variance?
+- 5.3 explain why runtime is longer.
 
 ## 7. Conclusion
 
