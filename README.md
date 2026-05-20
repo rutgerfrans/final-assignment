@@ -134,3 +134,12 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 - [DQN-Car-Racing-Repo-1](https://github.com/wiitt/DQN-Car-Racing)
 - [DQN-Car-Racing-Paper](https://arxiv.org/html/2410.22766v1#Ch1.S1) (showed rgb results but it was not on dqn but on resnet)
 - [DQN-Car-Racing-Repo-2](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) (also stating that color does not matter that much for this game but not why?)
+
+## Todo
+
+- Clean methodology and experimental setup sections
+- Write discussion 
+- Write Conclusion
+- Write What did I learn
+- Add demo
+- Record Video
