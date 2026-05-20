@@ -46,7 +46,7 @@ n_actions here is 5, since this setup is run in a discrete action space to suppo
 The [car racing environment](https://gymnasium.farama.org/environments/box2d/car_racing/) is a simple 2D RGB game, a small demo is givin below:
 
 <!-- markdownlint-disable MD033 -->
-<img src="imgs/car_racing.gif" alt="CarRacing" title="Car racing track" width="250"/>
+<img src="demos/car_racing.gif" alt="CarRacing" title="Car racing track" width="250"/>
 <!-- markdownlint-enable MD033 -->
 
 My goal is to check the difference between RGB and grayscale, so I created 2 preprocessing functions to handle color of frames.
@@ -179,11 +179,11 @@ The plot above shows the mean returns (over all 3 seeds) vs. episodes of all 4 v
 <!-- markdownlint-disable MD033 -->
 <table>
 <tr>
-<td><img src="src/runs/aggregate/dqn_RGB_returns.png" alt="dqnRGBReturns" title="DQN (RGB), return across 3 seeds" width="500"></td>
+<td><img src="src/runs/aggregate/dqn_rgb_returns.png" alt="dqnRGBReturns" title="DQN (RGB), return across 3 seeds" width="500"></td>
 <td><img src="src/runs/aggregate/dqn_gray_returns.png" alt="dqnGrayReturns" title="DQN (grayscale), return across 3 seeds" width="500"></td>
 </tr>
 <tr>
-<td><img src="src/runs/aggregate/ddqn_RGB_returns.png" alt="ddqnRGBReturns" title="Double DQN (RGB), return across 3 seeds" width="500"></td>
+<td><img src="src/runs/aggregate/ddqn_rgb_returns.png" alt="ddqnRGBReturns" title="Double DQN (RGB), return across 3 seeds" width="500"></td>
 <td><img src="src/runs/aggregate/ddqn_gray_returns.png" alt="ddqnGrayReturns" title="Double DQN (grayscale), return across 3 seeds" width="500"></td>
 </tr>
 </table>
@@ -206,7 +206,24 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 
 ## 5.5 Demo
 
-- insert GIF
+<!-- markdownlint-disable MD033 -->
+<table>
+<tr>
+<td align="center">DQN RGB (return 662)</td>
+<td align="center">DQN Grayscale (return 324)</td>
+<td align="center">Double-DQN RGB (return 791)</td>
+<td align="center">Double-DQN Grayscale (mean return 617)</td>
+</tr>
+<tr>
+<td><img src="demos/dqn_rgb_demo.gif" alt="CarRacing" title="DQN-RGB-Demo" width="250"/></td>
+<td><img src="demos/dqn_gray_demo.gif" alt="CarRacing" title="DQN-Gray-Demo" width="250"/></td>
+<td><img src="demos/ddqn_rgb_demo.gif" alt="CarRacing" title="Double-DQN-RGB-Demo" width="250"/></td>
+<td><img src="demos/ddqn_gray_demo.gif" alt="CarRacing" title="Double-DQN-Gray-Demo" width="250"/></td>
+</tr>
+</table>
+<!-- markdownlint-enable MD033 -->
+
+Note that these returns do not reflect the mean, these demos are ran over 1 episode of their final trained weights, so they can still differ from their mean measured output over 3 seeds seen in the plots.
 
 ## 6. Discussion
 
@@ -233,12 +250,41 @@ In this environment it is not that important, both RGB and grayscaling will lear
 ## 8. References
 
 - [1] [Wiitt's repo](https://github.com/wiitt/DQN-Car-Racing)
-- [2] [Self-Driving Car Racing: Application of Deep Reinforcement Learning](https://arxiv.org/html/2410.22766v1#Ch1.S1) (showed RGB results but it was not on dqn but on resnet)
-- [3] [andywu](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) (also stating that color does not matter that much for this game but not why?)
+- [2] [Self-Driving Car Racing: Application of Deep Reinforcement Learning]
+- [3] [andywu](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN)
 - [4] [PyTorch](https://pytorch.org/)
 - [5] [Gymnasium](https://gymnasium.farama.org/)
 
-## Todo
+## 9. Setup and install
 
-- Add demo in result
-- Record Video
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Train**  
+
+```bash
+python3 src.train
+```
+
+**Evaluate**  
+
+```bash
+python3 src.evaluate --model <path to weigths> --episodes <n> --render
+```
+
+**Run Sweep as Experiment**  
+
+Dont forget to set VARIANTS and SEEDS in config.py
+
+```bash
+python3 src.run_sweep
+```
+
+**Run Plots**  
+
+```bash
+python3 src.aggregate_results
+```
