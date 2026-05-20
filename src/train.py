@@ -20,6 +20,7 @@ def make_env():
     return env
 
 # Epsilon-greedy action selection
+# This greedy step was based on slide 8 of Lect 7 - Generalisation and Control, and the epsilon decay is a linear schedule from eps_start to eps_end over eps_decay steps.
 def select_action(state, eps, net, device):
     if random.random() < eps:
         return random.randint(0, 4)
@@ -33,6 +34,7 @@ def select_action(state, eps, net, device):
 # Done using Torch's no_grad() and Torch's nn.functional.mse_loss for the loss calculation.
 # https://pytorch.org/docs/stable/generated/torch.no_grad.html
 # https://pytorch.org/docs/stable/generated/torch.nn.functional.mse_loss.html
+# The Double-DQN line is based on slide 13 from Lect 7 - Generalisation and Control, where the best action is selected using the policy network but the target Q-value is obtained from the target network.
 def compute_loss(batch, policy_net, target_net, double_dqn: bool):
     states, actions, rewards, next_states, dones = batch
     q_vals = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -173,12 +175,12 @@ def train(cfg: dict):
         loss_sum = 0.0
         loss_count = 0
 
+        # most of this part is based on the pseudcode from slide 8 of Lect 7 - Generalisation and Control
         while not done:
-            # decay eps and get action from policy
+            # decay eps, get action from policy, and get next state from this chosen action
+            
             eps = max(eps_end, eps_start - (eps_start - eps_end) * total_steps / eps_decay)
             action = select_action(state, eps, policy_net, device)
-
-            # get next state from chosen action
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
 

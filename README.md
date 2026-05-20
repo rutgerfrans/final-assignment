@@ -94,6 +94,7 @@ def sample(self, batch_size, device):
 Computing loss:
 
 ```python
+# Based on slide 13 from Lect 7 - Generalisation and Control
 def compute_loss(batch, policy_net, target_net, double_dqn: bool):
     states, actions, rewards, next_states, dones = batch
     q_vals = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -240,6 +241,4 @@ In this environment it is not that important, both RGB and grayscaling will lear
 ## Todo
 
 - Add demo in result
-- Go over intro en problem statement
-- refer in code snippets in methodology section to lecture
 - Record Video
