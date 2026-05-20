@@ -1,8 +1,3 @@
-"""Run all 12 (algo, input, seed) combinations sequentially.
-
-Skips runs whose episodes.csv already shows MAX_EPISODES completed episodes,
-so the script is restartable.
-"""
 import time
 from pathlib import Path
 

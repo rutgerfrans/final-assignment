@@ -1,4 +1,3 @@
-"""Aggregate the 12 sweep CSVs into mean ± std plots and a summary table."""
 import csv
 from pathlib import Path
 import numpy as np
