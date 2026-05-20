@@ -16,19 +16,10 @@ To be a little bit more specific: "Is color really not that important for this t
 
 ## 3. Methodology
 
-I used Torch (CITE) for the DQN's and Gymnasium for the environment. My goal is to check the difference between RGB and grayscale, so I created to preprocessing functions to handle color of frames. I used a standard DQN network as can here be seen:
+I used [PyTorch](https://pytorch.org/) for the DQN's and [Gymnasium](https://gymnasium.farama.org/) for the car racing environment. 
 
-On top of that I got inspired by this repo [DQN-Car-Racing-Repo-1](https://github.com/wiitt/DQN-Car-Racing), and also implemented Double-DQN. I know this does not really have to do any thing with measuring the difference between RGB and grayscale. But as I said in the beginning I am here to learn some cool things about RL, so why not throw some exploration in there! Double-DQN it is, so I tried this as well just to see what kind of effects it has on output results and mainly "why?".
-
-To see wheter my implementation is somewhat correct, I matched the results using this repo: [DQN-Car-Racing-Repo-1](https://github.com/wiitt/DQN-Car-Racing). Note that I did not copy any code what so ever, even better, their implementation is completely Gymnasium based as where I used Torch and Gymnasium as a combination.
-
-## 4. Experimental Setup
-
-I ran 4 different networks, with each 3 different seeds for trustable outcomes and reproducibility. This means 12 different configurations. They are as followed:
-
-- DQN/Double DQN \* RGB/Grayscale \* 3 different seeds.
-
-Over all configurations, the network architecture and parameters stayed the same, they are as follows:
+**The Network Architecture**  
+The DQN network Architecture is as follows:
 
 ```mermaid
 flowchart LR
@@ -41,23 +32,129 @@ flowchart LR
     K --> L["Q-values<br/>(B, n_actions)"]
 ```
 
+n_actions here is 5, since this setup is run in a discrete action space to support DQN. The actions a car can take are:
+
+| Index | Action     |
+|-------|------------|
+| 0     | Do nothing |
+| 1     | Steer left |
+| 2     | Steer right|
+| 3     | Gas        |
+| 4     | Brake      |
+
+**The Environment**  
+The [car racing environment](https://gymnasium.farama.org/environments/box2d/car_racing/) is a simple 2D rgb game, a small demo is givin below:
+
+<!-- markdownlint-disable MD033 -->
+<img src="imgs/car_racing.gif" alt="CarRacing" title="Car racing track" width="250"/>
+<!-- markdownlint-enable MD033 -->
+
+My goal is to check the difference between RGB and grayscale, so I created 2 preprocessing functions to handle color of frames.
+
+**RGB preprocessing:**
+
+```python
+def preprocess_without_graysscale(obs):
+    # (96, 96, 3) uint8 -> (3, 84, 96) uint8, drops bottom indicator strip
+    return obs[:84].transpose(2, 0, 1).copy()
+```
+
+**Grayscale Preprocessing:**
+
+```python
+def preprocess_grayscale(obs):
+    # (96, 96, 3) uint8 -> (1, 84, 96) uint8, drops bottom indicator strip
+    gray = 0.2989 * obs[:84, :, 0] + 0.5870 * obs[:84, :, 1] + 0.1140 * obs[:84, :, 2]
+    return gray.astype(np.uint8)[np.newaxis]
+```
+
+**DQN and Double-DQN**  
+On top of that I got inspired by this online repo by [witt](https://github.com/wiitt/DQN-Car-Racing), and also implemented Double-DQN. I know this does not really have to do any thing with measuring the difference between RGB and grayscale. But as I said in the beginning I am here to learn some cool things about RL, so why not throw some exploration in there! Double-DQN it is, so I tried this as well just to see what kind of effects it has on output results and mainly "why?".  
+
+In short Double-DQN avoids overestimation. Since DQN only uses a single network to believe its own "hype", returns my be overestimating opposed to reality. Double-DQN uses two networks to create a believe about the return of a next action. The policy network says "Action A looks best!" and the target network will ask "Is action A really the best?". In case of overestimation, return will get corrected. Overestimation only exists when both networks are wrong which is a rarer occasion. So we should expect more stable return plots within the results section.  
+
+The code snippets hereunder shows some of the innerworkings:  
+
+The Data:
+
+```python
+def sample(self, batch_size, device):
+    idxs = np.random.choice(self.size, batch_size, replace=False)
+    ends = self.frame_ends[idxs]
+    states = np.stack([self._stack(e, shift=1) for e in ends])
+    next_states = np.stack([self._stack(e, shift=0) for e in ends])
+    return (
+        torch.tensor(states, dtype=torch.uint8, device=device).float() / 255.0,
+        torch.tensor(self.actions[idxs],dtype=torch.int64, device=device),
+        torch.tensor(self.rewards[idxs], dtype=torch.float32, device=device),
+        torch.tensor(next_states, dtype=torch.uint8, device=device).float() / 255.0,
+        torch.tensor(self.dones[idxs], dtype=torch.float32, device=device),
+```
+
+Computing loss:
+
+```python
+def compute_loss(batch, policy_net, target_net, double_dqn: bool):
+    states, actions, rewards, next_states, dones = batch
+    q_vals = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+    with torch.no_grad():
+        if double_dqn:
+            best_actions = policy_net(next_states).argmax(1, keepdim=True)
+            max_next_q = target_net(next_states).gather(1, best_actions).squeeze(1)
+        else:
+            max_next_q = target_net(next_states).max(1)[0]
+        targets = rewards + GAMMA * max_next_q * (1 - dones)
+    return nn.functional.mse_loss(q_vals, targets)
+```
+
+Updating the networks:
+
+```python
+# updates policy network after the buffer is warm
+if len(buffer) >= train_start:
+    batch = buffer.sample(batch_size, device)
+    loss = compute_loss(batch, policy_net, target_net, double_dqn) # error
+    optimizer.zero_grad() 
+    loss.backward()
+    nn.utils.clip_grad_norm_(policy_net.parameters(), 10) # clip the updates if needed
+    optimizer.step()
+    loss_sum += loss.item()
+    loss_count += 1
+# updates target network after each target_update condition is met (1000)
+if total_steps % target_update == 0:
+    target_net.load_state_dict(policy_net.state_dict())
+
+optimizer = torch.optim.Adam(policy_net.parameters(), lr=cfg["LR"])
+```
+
+**Validating Implementation**  
+To see wheter my implementation is somewhat correct, I matched the results using the results from [witt's](https://github.com/wiitt/DQN-Car-Racing) repo. Note that I did not copy any code what so ever, even better, their implementation is completely Gymnasium based as where I used PyTorch and Gymnasium as a combination.
+
+## 4. Experimental Setup
+
+I ran 4 different networks, with each 3 different seeds for trustable outcomes and reproducibility. This means 12 different configurations. They are as followed:
+
+- DQN/Double DQN \* RGB/Grayscale \* 3 different seeds.
+
+Over all configurations, the network architecture and parameters stayed the same, they are as follows:
+
 In config.py exists a parameter called DOUBLE_DQN, that enables the user to turn double DQN on or off.
 
 Some other settings from config.py:
 
-``` ~python
-EPS_START     = 1.0
-EPS_END       = 0.05
-EPS_DECAY     = 150_000
-TRAIN_START   = 5_000
+```python
+EPS_START = 1.0
+EPS_END = 0.05
+EPS_DECAY = 150_000
+TRAIN_START = 5_000
 TARGET_UPDATE = 1_000
-SAVE_EVERY    = 10
-MAX_EPISODES  = 1_000
-GAMMA         = 0.99
-LR            = 1e-4
-BATCH_SIZE    = 32
-BUFFER_SIZE   = 300_000
-STACK_N       = 4
+SAVE_EVERY = 10
+MAX_EPISODES = 1_000
+GAMMA = 0.99
+LR = 1e-4
+BATCH_SIZE = 32
+BUFFER_SIZE = 300_000
+STACK_N = 4
 ```
 
 I deliberatly choose to run only 1000 episodes (250k steps), since this alone took around 1.5-2hrs. The whole sweep took me around 24 hours to run. But 1000 episodes were also just enough to show decent learning results and explain difference where needed.
@@ -131,15 +228,17 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 
 ## 8. References
 
-- [DQN-Car-Racing-Repo-1](https://github.com/wiitt/DQN-Car-Racing)
+- [witt](https://github.com/wiitt/DQN-Car-Racing)
 - [DQN-Car-Racing-Paper](https://arxiv.org/html/2410.22766v1#Ch1.S1) (showed rgb results but it was not on dqn but on resnet)
 - [DQN-Car-Racing-Repo-2](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) (also stating that color does not matter that much for this game but not why?)
+- [PyTorch](https://pytorch.org/)
+- [Gymnasium](https://gymnasium.farama.org/)
 
 ## Todo
 
-- Clean methodology and experimental setup sections
+- Clean experimental setup sections
 - Write discussion 
 - Write Conclusion
 - Write What did I learn
-- Add demo
+- Add demo in result
 - Record Video

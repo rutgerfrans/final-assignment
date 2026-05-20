@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 from src.config import RUNS_DIR, SEEDS, VARIANTS, variant_name
 
 
-AGG_DIR  = RUNS_DIR / "aggregate"
-ROLL_W   = 100
-DUR_W    = 50
+AGG_DIR = RUNS_DIR / "aggregate"
+ROLL_W = 100
+DUR_W = 50
 
 
 def variant_title(double_dqn, grayscale):
@@ -46,17 +46,17 @@ def main():
     final_n = min(100, n)
 
     summary_rows = []
-    per_variant_roll    = {}   # (mean, std)
-    per_variant_dur     = {}   # mean per-episode duration over training
-    per_variant_totals  = {}   # total runtime per seed
+    per_variant_roll = {}   # (mean, std)
+    per_variant_dur = {}   # mean per-episode duration over training
+    per_variant_totals = {}   # total runtime per seed
 
     for d, g in VARIANTS:
         name = variant_name(d, g)
         runs = loaded[name]
         returns_arr = np.stack([r[:n] for r, _ in runs])
         # first episode's duration is wall[0]; subsequent are diffs
-        dur_arr     = np.stack([np.diff(w[:n], prepend=0.0) for _, w in runs])
-        totals      = np.array([w[n - 1] for _, w in runs])
+        dur_arr = np.stack([np.diff(w[:n], prepend=0.0) for _, w in runs])
+        totals = np.array([w[n - 1] for _, w in runs])
 
         roll_per_seed = np.stack([rolling_mean(returns_arr[i], roll_w) for i in range(len(returns_arr))])
         roll_mean = roll_per_seed.mean(axis=0)

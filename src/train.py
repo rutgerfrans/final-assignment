@@ -38,7 +38,6 @@ def compute_loss(batch, policy_net, target_net, double_dqn: bool):
     q_vals = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
     with torch.no_grad():
         if double_dqn:
-            # use policy_net to select the action, target_net to evaluate it
             best_actions = policy_net(next_states).argmax(1, keepdim=True)
             max_next_q = target_net(next_states).gather(1, best_actions).squeeze(1)
         else:
@@ -84,16 +83,16 @@ def train(cfg: dict):
         torch.cuda.manual_seed_all(seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    grayscale  = cfg["GRAYSCALE"]
+    grayscale = cfg["GRAYSCALE"]
     double_dqn = cfg["DOUBLE_DQN"]
-    stack_n    = cfg["STACK_N"]
+    stack_n = cfg["STACK_N"]
     preprocess_fn = preprocess_grayscale if grayscale else preprocess_without_graysscale
-    frame_shape   = (1, 84, 96) if grayscale else (3, 84, 96)
-    in_channels   = stack_n * (1 if grayscale else 3)
+    frame_shape = (1, 84, 96) if grayscale else (3, 84, 96)
+    in_channels = stack_n * (1 if grayscale else 3)
 
     weights_dir = Path(cfg["weights_dir"])
-    plots_dir   = Path(cfg["plots_dir"])
-    csv_path    = Path(cfg["csv_path"])
+    plots_dir = Path(cfg["plots_dir"])
+    csv_path = Path(cfg["csv_path"])
     weights_dir.mkdir(parents=True, exist_ok=True)
     plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -120,18 +119,18 @@ def train(cfg: dict):
     target_net.load_state_dict(policy_net.state_dict())
     target_net.eval()
 
-    optimizer = torch.optim.Adam(policy_net.parameters(), lr=cfg["LR"]) # TODO: Experiment with different optimizers
+    optimizer = torch.optim.Adam(policy_net.parameters(), lr=cfg["LR"])
     buffer = ReplayBuffer(cfg["BUFFER_SIZE"], stack_n=stack_n, frame_shape=frame_shape)
     frame_stack = FrameStack(stack_n)
 
-    eps_start  = cfg["EPS_START"]
-    eps_end    = cfg["EPS_END"]
-    eps_decay  = cfg["EPS_DECAY"]
-    train_start   = cfg["TRAIN_START"]
+    eps_start = cfg["EPS_START"]
+    eps_end = cfg["EPS_END"]
+    eps_decay = cfg["EPS_DECAY"]
+    train_start = cfg["TRAIN_START"]
     target_update = cfg["TARGET_UPDATE"]
-    save_every    = cfg["SAVE_EVERY"]
-    max_episodes  = cfg["MAX_EPISODES"]
-    batch_size    = cfg["BATCH_SIZE"]
+    save_every = cfg["SAVE_EVERY"]
+    max_episodes = cfg["MAX_EPISODES"]
+    batch_size = cfg["BATCH_SIZE"]
 
     total_steps = 0
     episode_numbers = []
@@ -192,7 +191,7 @@ def train(cfg: dict):
             episode_return += reward
             total_steps += 1
 
-            # updates policy network after the buffer is "warm"
+            # updates policy network after the buffer is warm
             if len(buffer) >= train_start:
                 batch = buffer.sample(batch_size, device)
                 loss = compute_loss(batch, policy_net, target_net, double_dqn)

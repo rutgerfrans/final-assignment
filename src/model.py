@@ -26,7 +26,7 @@ class SkipFrame(gym.Wrapper):
     # normalizing pixel values to [0, 1] for stable training
 def preprocess_grayscale(obs):
     # (96, 96, 3) uint8 -> (1, 84, 96) uint8, drops bottom indicator strip
-    gray = 0.2989 * obs[:84, :, 0] + 0.5870 * obs[:84, :, 1] + 0.1140 * obs[:84, :, 2]
+    gray = 0.2989 * obs[:84, :, 0] + 0.5870 * obs[:84, :, 1] + 0.1140 * obs[:84, :, 2] # the literal gray color
     return gray.astype(np.uint8)[np.newaxis]
 
 def preprocess_without_graysscale(obs):
@@ -76,20 +76,17 @@ class DQN(nn.Module):
         x = self.conv(x).view(x.size(0), -1)
         return self.fc(x)
 
-# Stores individual raw frames in a ring buffer instead of full stacked states.
-# With stack_n=4 and 3-channel frames this uses ~8x less RAM than storing stacked states.
-# push() takes one new frame per step; stacks are reconstructed at sample time.
 class ReplayBuffer:
     def __init__(self, capacity, stack_n=4, frame_shape=(3, 84, 96)):
         self.capacity = capacity
         self.stack_n  = stack_n
-        self._n = capacity + stack_n          # frame ring needs a small headroom
-        self.frames     = np.zeros((self._n, *frame_shape), dtype=np.uint8)
-        self.actions    = np.zeros(capacity, dtype=np.int64)
-        self.rewards    = np.zeros(capacity, dtype=np.float32)
-        self.dones      = np.zeros(capacity, dtype=np.float32)
-        self.frame_ends = np.zeros(capacity, dtype=np.int32)  # last-frame index of each next_state
-        self.size      = 0
+        self._n = capacity + stack_n 
+        self.frames = np.zeros((self._n, *frame_shape), dtype=np.uint8)
+        self.actions = np.zeros(capacity, dtype=np.int64)
+        self.rewards = np.zeros(capacity, dtype=np.float32)
+        self.dones = np.zeros(capacity, dtype=np.float32)
+        self.frame_ends = np.zeros(capacity, dtype=np.int32)
+        self.size = 0
         self.trans_pos = 0
         self.frame_pos = 0
 
@@ -100,11 +97,11 @@ class ReplayBuffer:
             self.frame_pos = (self.frame_pos + 1) % self._n
 
     def push(self, new_frame, action, reward, done):
-        self.frames[self.frame_pos]         = new_frame
-        self.frame_ends[self.trans_pos]     = self.frame_pos
-        self.actions[self.trans_pos]        = action
-        self.rewards[self.trans_pos]        = reward
-        self.dones[self.trans_pos]          = done
+        self.frames[self.frame_pos] = new_frame
+        self.frame_ends[self.trans_pos] = self.frame_pos
+        self.actions[self.trans_pos] = action
+        self.rewards[self.trans_pos] = reward
+        self.dones[self.trans_pos] = done
         self.frame_pos = (self.frame_pos + 1) % self._n
         self.trans_pos = (self.trans_pos + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
@@ -117,17 +114,16 @@ class ReplayBuffer:
         )
 
     def sample(self, batch_size, device):
-        idxs        = np.random.choice(self.size, batch_size, replace=False)
-        ends        = self.frame_ends[idxs]
-        states      = np.stack([self._stack(e, shift=1) for e in ends])
+        idxs = np.random.choice(self.size, batch_size, replace=False)
+        ends = self.frame_ends[idxs]
+        states = np.stack([self._stack(e, shift=1) for e in ends])
         next_states = np.stack([self._stack(e, shift=0) for e in ends])
         return (
-            torch.tensor(states,             dtype=torch.uint8, device=device).float() / 255.0,
-            torch.tensor(self.actions[idxs], dtype=torch.int64, device=device),
+            torch.tensor(states, dtype=torch.uint8, device=device).float() / 255.0,
+            torch.tensor(self.actions[idxs],dtype=torch.int64, device=device),
             torch.tensor(self.rewards[idxs], dtype=torch.float32, device=device),
-            torch.tensor(next_states,        dtype=torch.uint8, device=device).float() / 255.0,
-            torch.tensor(self.dones[idxs],   dtype=torch.float32, device=device),
-        )
+            torch.tensor(next_states, dtype=torch.uint8, device=device).float() / 255.0,
+            torch.tensor(self.dones[idxs], dtype=torch.float32, device=device),        )
 
     def __len__(self):
         return self.size
