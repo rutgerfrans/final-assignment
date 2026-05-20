@@ -6,11 +6,11 @@ Rutger de Groen - i6297772
 
 ## 1. Introduction
 
-Carracing environments in AI were one of the first things that intrigued me about AI. "How the hell does this 2D car learn to drive this weird maze in several 100 generations?", i was baffled, did not understand this at all. Now 6 years later, following a course called Reinforcement Learning, I got the opportunity (Read: I was lazy for 6 years) to delve deeper into this matter. This final assignment implements a DQN algorithm to the carracing environment provided by Gymnasium (CITE) to teach a car drive a circuit.
+Carracing environments in AI were one of the first things that intrigued me about AI. "How the hell does this 2D car learn to drive this weird maze in several 100 generations?", i was baffled, did not understand this at all. Now 6 years later, following a course called Reinforcement Learning, I got the opportunity (Read: I was lazy for 6 years) to delve deeper into this matter. This final assignment implements a DQN algorithm to the carracing environment provided by [Gymnasium](https://gymnasium.farama.org/) to teach a car drive a course.
 
 ## 2. Problem Statement or Research Statement
 
-Ofcours I am not the first one trying to teach this car to drive. This environment is merely a toy example compared to what Tesla is doing with their cars. But anyways, I am here to learn about RL not about full driving autonomous cars in the real world. One of the first things I noticed about several implementation of DQN on the carracing environment from gymnasium, was the fact that all of them were trained after grayscaling the frames. I asked myself, "why not in rgb?". I guess the answer is quite trivial, the car does not neceserally have to learn colors to understand shapes and edges as long as there is some difference to the road and off-road parts. And secondly grayscale means learning less information, 1 channel instead of 3 color channels, so less computational complexity. But none of the online work (CITE) I found showed rgb results or talked about this difference fundamentally. So this final assignment I am going to figure out why people choose grayscaling over rgb, and if the "trivial" answer is so "trivial" after all!
+Ofcours I am not the first one trying to teach this car to drive. This environment is merely a toy example compared to what Tesla is doing with their cars. But anyways, I am here to learn about RL not about full driving autonomous cars in the real world. One of the first things I noticed about several implementation of DQN on the carracing environment from gymnasium, was the fact that all of them were trained after grayscaling the frames. I asked myself, "why not in RGB?". I guess the answer is quite trivial, the car does not neceserally have to learn colors to understand shapes and edges as long as there is some difference to the road and off-road parts. And secondly grayscale means learning less information, 1 channel instead of 3 color channels, so less computational complexity. But none of the online work [[1]](https://github.com/wiitt/DQN-Car-Racing),[[2]](https://arxiv.org/html/2410.22766v1#Ch1.S1),[[3]](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) I found showed RGB results or talked about this difference fundamentally. So this final assignment I am going to figure out why people choose grayscaling over RGB, and if the "trivial" answer is so "trivial" after all!
 
 To be a little bit more specific: "Is color really not that important for this type of game? and whatever the outcome is, why?"
 
@@ -43,7 +43,7 @@ n_actions here is 5, since this setup is run in a discrete action space to suppo
 | 4     | Brake      |
 
 **The Environment**  
-The [car racing environment](https://gymnasium.farama.org/environments/box2d/car_racing/) is a simple 2D rgb game, a small demo is givin below:
+The [car racing environment](https://gymnasium.farama.org/environments/box2d/car_racing/) is a simple 2D RGB game, a small demo is givin below:
 
 <!-- markdownlint-disable MD033 -->
 <img src="imgs/car_racing.gif" alt="CarRacing" title="Car racing track" width="250"/>
@@ -69,7 +69,7 @@ def preprocess_grayscale(obs):
 ```
 
 **DQN and Double-DQN**  
-On top of that I got inspired by this online repo by [witt](https://github.com/wiitt/DQN-Car-Racing), and also implemented Double-DQN. I know this does not really have to do any thing with measuring the difference between RGB and grayscale. But as I said in the beginning I am here to learn some cool things about RL, so why not throw some exploration in there! Double-DQN it is, so I tried this as well just to see what kind of effects it has on output results and mainly "why?".  
+On top of that I got inspired by this online repo by [wiitt](https://github.com/wiitt/DQN-Car-Racing), and also implemented Double-DQN. I know this does not really have to do any thing with measuring the difference between RGB and grayscale. But as I said in the beginning I am here to learn some cool things about RL, so why not throw some exploration in there! Double-DQN it is, so I tried this as well just to see what kind of effects it has on output results and mainly "why?".  
 
 In short Double-DQN avoids overestimation. Since DQN only uses a single network to believe its own "hype", returns my be overestimating opposed to reality. Double-DQN uses two networks to create a believe about the return of a next action. The policy network says "Action A looks best!" and the target network will ask "Is action A really the best?". In case of overestimation, return will get corrected. Overestimation only exists when both networks are wrong which is a rarer occasion. So we should expect more stable return plots within the results section.  
 
@@ -128,7 +128,7 @@ optimizer = torch.optim.Adam(policy_net.parameters(), lr=cfg["LR"])
 ```
 
 **Validating Implementation**  
-To see wheter my implementation is somewhat correct, I matched the results using the results from [witt's](https://github.com/wiitt/DQN-Car-Racing) repo. Note that I did not copy any code what so ever, even better, their implementation is completely Gymnasium based as where I used PyTorch and Gymnasium as a combination.
+To see wheter my implementation is somewhat correct, I matched the results using the results from [wiitt's](https://github.com/wiitt/DQN-Car-Racing) repo. Note that I did not copy any code what so ever, even better, their implementation is completely Gymnasium based as where I used PyTorch and Gymnasium as a combination.
 
 ## 4. Experimental Setup
 
@@ -178,11 +178,11 @@ The plot above shows the mean returns (over all 3 seeds) vs. episodes of all 4 v
 <!-- markdownlint-disable MD033 -->
 <table>
 <tr>
-<td><img src="src/runs/aggregate/dqn_rgb_returns.png" alt="dqnRgbReturns" title="DQN (RGB), return across 3 seeds" width="500"></td>
+<td><img src="src/runs/aggregate/dqn_RGB_returns.png" alt="dqnRGBReturns" title="DQN (RGB), return across 3 seeds" width="500"></td>
 <td><img src="src/runs/aggregate/dqn_gray_returns.png" alt="dqnGrayReturns" title="DQN (grayscale), return across 3 seeds" width="500"></td>
 </tr>
 <tr>
-<td><img src="src/runs/aggregate/ddqn_rgb_returns.png" alt="ddqnRgbReturns" title="Double DQN (RGB), return across 3 seeds" width="500"></td>
+<td><img src="src/runs/aggregate/ddqn_RGB_returns.png" alt="ddqnRGBReturns" title="Double DQN (RGB), return across 3 seeds" width="500"></td>
 <td><img src="src/runs/aggregate/ddqn_gray_returns.png" alt="ddqnGrayReturns" title="Double DQN (grayscale), return across 3 seeds" width="500"></td>
 </tr>
 </table>
@@ -211,7 +211,7 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 
 Some interesting results showed up!
 
-First of all I found it very interesting why Double-DQN performed worse on the grayscaled setup but better on the RGB setup. Images in section 5.1 and 5.2 depict this. I found this interesting because this difference is the most significant between 2 variants. [Witt's](https://github.com/wiitt/DQN-Car-Racing) results showed that grayscaled Double-DQN also performed worse than grayscaled DQN. What is interesting about this is that Double-DQN tries to minimize overestimation. But the 4th plot shows that Double-DQN has way higher variance compared to its RGB friend. It gives me the indication that Double-DQN overestimation fix only pays off when the features are clean enough to trust. Maybe the RGB images provide this extra piece of information. But since this is only an n=3 seeds experiment, there might still exist some seed noise, could be a future prospect!
+First of all I found it very interesting why Double-DQN performed worse on the grayscaled setup but better on the RGB setup. Images in section 5.1 and 5.2 depict this. I found this interesting because this difference is the most significant between 2 variants. [Wiitt's](https://github.com/wiitt/DQN-Car-Racing) results showed that grayscaled Double-DQN also performed worse than grayscaled DQN. What is interesting about this is that Double-DQN tries to minimize overestimation. But the 4th plot shows that Double-DQN has way higher variance compared to its RGB friend. It gives me the indication that Double-DQN overestimation fix only pays off when the features are clean enough to trust. Maybe the RGB images provide this extra piece of information. But since this is only an n=3 seeds experiment, there might still exist some seed noise, could be a future prospect!
 
 Now a more obvious question or finding. Why does RGB dominate grayscale in all variants and why does it have less variance compared to its grayscaled friends? These where questions that ran through my mind looking at the plots from 5.1 and 5.2. I think the obvious answer is that RGB images simply carry more features than grayscaled once. It gives the model more information to learn about and in this case it enhanced performance, returns were way higher. I think the same holds for the variance: with more, and more reliable, features to anchor on, the different seeds learn more consistently, so there's less spread between runs.
 
@@ -225,13 +225,17 @@ So in the end I tried to find out what is about people choosing grayscaling over
 
 Lastly, I thought this was a very fun project overall. I finally learned about how does damn 2d cars drive around on a simple course. I learned how DQNs and Double-DQNs are implemented. And above all I got a good understanding of what it means to preprocess images for such a network with regards to color!
 
+So to get back at my "more specific" question: "Is color really not that important for this type of game? and whatever the outcome is, why?"
+
+In this environment it is not that important, both RGB and grayscaling will learn the car to drive. Only RGB in combination with Double-DQN will result in the highest and most stable returns within 1000 episodes.
+
 ## 8. References
 
-- [witt](https://github.com/wiitt/DQN-Car-Racing)
-- [DQN-Car-Racing-Paper](https://arxiv.org/html/2410.22766v1#Ch1.S1) (showed rgb results but it was not on dqn but on resnet)
-- [DQN-Car-Racing-Repo-2](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) (also stating that color does not matter that much for this game but not why?)
-- [PyTorch](https://pytorch.org/)
-- [Gymnasium](https://gymnasium.farama.org/)
+- [1] [Wiitt's repo](https://github.com/wiitt/DQN-Car-Racing)
+- [2] [Self-Driving Car Racing: Application of Deep Reinforcement Learning](https://arxiv.org/html/2410.22766v1#Ch1.S1) (showed RGB results but it was not on dqn but on resnet)
+- [3] [andywu](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN) (also stating that color does not matter that much for this game but not why?)
+- [4] [PyTorch](https://pytorch.org/)
+- [5] [Gymnasium](https://gymnasium.farama.org/)
 
 ## Todo
 
