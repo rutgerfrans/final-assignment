@@ -132,15 +132,15 @@ To see wheter my implementation is somewhat correct, I matched the results using
 
 ## 4. Experimental Setup
 
-I ran 4 different networks, with each 3 different seeds for trustable outcomes and reproducibility. This means 12 different configurations. They are as followed:
+To measure the difference between RGB and Grayscaling I set out 1 big experiment. I ran 4 different variants of the DQN network, with each 3 different seeds for trustable outcomes and reproducibility. This means 12 different configurations. They are as followed:
 
-- DQN/Double DQN \* RGB/Grayscale \* 3 different seeds.
+- DQN with RGB images ran on 3 different seeds [0,1,2].
+- DQN with Grayscaled images ran " .
+- Double-DQN with RGB images ran " .
+- Double-DQN with Grayscaled images ran " .
 
-Over all configurations, the network architecture and parameters stayed the same, they are as follows:
-
-In config.py exists a parameter called DOUBLE_DQN, that enables the user to turn double DQN on or off.
-
-Some other settings from config.py:
+Over all configurations, the network architecture and parameters stayed the same, they are as depicted in the architecture visualization in the methodology section:
+The other parameters are defined in config.py, the most important ones listed here:
 
 ```python
 EPS_START = 1.0
@@ -157,13 +157,11 @@ BUFFER_SIZE = 300_000
 STACK_N = 4
 ```
 
-I deliberatly choose to run only 1000 episodes (250k steps), since this alone took around 1.5-2hrs. The whole sweep took me around 24 hours to run. But 1000 episodes were also just enough to show decent learning results and explain difference where needed.
+I deliberatly choose to run only 1000 episodes (250k steps), since this alone took around 1.5-2hrs. The whole sweep took me around 24 hours to run. But 1000 episodes were also just enough to show decent learning results and explain difference where needed. Other than that most of the configuration parameters are inspired by online literature, to match the results so I could purely focus on the RGB vs. Grayscaling matter.
 
-Other than that most of the configuration parameters are inspired by online work, to match the results so I could purely focus on the RGB vs. Grayscaling matter.
+For each configuration the output returns and runtime, were logged, saved as csv, and plotted.
 
-For each configuration the output returns and Runtime, were logged, saved as csv, and plotted.
-
-All configurations where ran on a Desktop PC, with 32 GB of RAM, a GTX1070 (please sponsor me, I would love to have better GPU), and AMD Ryzen 5 3600 6-core processor × 12.
+All configurations where ran on a Desktop PC, with 32 GB of RAM, a GTX 1070 (please sponsor me, I would love to have better GPU), and AMD Ryzen 5 3600 6-core processor × 12.
 
 ## 5. Results
 
@@ -211,20 +209,21 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 
 ## 6. Discussion
 
-- explain why resultls are like this. interpret them.
-- 5.1/5.2 why does Double DQN perform bad on grayscaling but well on rgb?
-- 5.1 why does rgb perform better over the same amount of episodes?
-- 5.2 why does rgb have less variance?
-- 5.3 explain why runtime is longer.
+Some interesting results showed up!
+
+First of all I found it very interesting why Double-DQN performed worse on the grayscaled setup but better on the RGB setup. Images in section 5.1 and 5.2 depict this. I found this interesting because this difference is the most significant between 2 variants. [Witt's](https://github.com/wiitt/DQN-Car-Racing) results showed that grayscaled Double-DQN also performed worse than grayscaled DQN. What is interesting about this is that Double-DQN tries to minimize overestimation. But the 4th plot shows that Double-DQN has way higher variance compared to its RGB friend. It gives me the indication that Double-DQN overestimation fix only pays off when the features are clean enough to trust. Maybe the RGB images provide this extra piece of information. But since this is only an n=3 seeds experiment, there might still exist some seed noise, could be a future prospect!
+
+Now a more obvious question or finding. Why does RGB dominate grayscale in all variants and why does it have less variance compared to its grayscaled friends? These where questions that ran through my mind looking at the plots from 5.1 and 5.2. I think the obvious answer is that RGB images simply carry more features than grayscaled once. It gives the model more information to learn about and in this case it enhanced performance, returns were way higher. I think the same holds for the variance: with more, and more reliable, features to anchor on, the different seeds learn more consistently, so there's less spread between runs.
+
+The previous result gave me another question to think about. Why, if the results for RGB are better in the same amount of episodes, would one still use a grayscaled setup? Well said the voice in my head, "Because less channels, less computations, less thinking your pc has to do, its faster!". So I was happy that I recorderd runtime as well! Plot 5.3 shows the different runtime between the variants. The RGB ones clearly have higher values, but I beg to differ that this difference should not be that convincing to choose a grayscaled setup. In my particular case atleast not since the grayscaled setups were only around ~10 minutes faster. I might understand in more difficult environments that one would choose grayscaling over RGB, but for this 2d car racing environment it looks like it does not matter too much.
 
 ## 7. Conclusion
 
-- i guess we could say it does not matter that much.
-- more iumportantly if it is because of time, i would not change to grayscale, time is not that big of a deal
-- my experience showed that RAM was more of an issue (does rgb have influence on this?)
-- more over RGB seems to show better convergence overall, if it does not take that much more time, why not choose it if the returns are better within the same number of episodes?
+So in the end I tried to find out what is about people choosing grayscaling over RGB. I think in general the preference holds, but not necessaraly in cases like this car racing environment. Such cases are easy enough for which staying at an RGB setup would not matter too much. Even better, it will return higher more consistent and stable results over the same amount of episodes with only a delay of ~10 minutes.
 
 ### 7.1 What did I learn?
+
+Lastly, I thought this was a very fun project overall. I finally learned about how does damn 2d cars drive around on a simple course. I learned how DQNs and Double-DQNs are implemented. And above all I got a good understanding of what it means to preprocess images for such a network with regards to color!
 
 ## 8. References
 
@@ -236,9 +235,7 @@ These plots show a clear difference in runtime between the RGB and Grayscale var
 
 ## Todo
 
-- Clean experimental setup sections
-- Write discussion 
-- Write Conclusion
-- Write What did I learn
 - Add demo in result
+- Go over intro en problem statement
+- refer in code snippets in methodology section to lecture
 - Record Video
