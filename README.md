@@ -250,7 +250,7 @@ In this environment it is not that important, both RGB and grayscaling will lear
 ## 8. References
 
 - [1] [Wiitt's repo](https://github.com/wiitt/DQN-Car-Racing)
-- [2] [Self-Driving Car Racing: Application of Deep Reinforcement Learning]
+- [2] [Self-Driving Car Racing: Application of Deep Reinforcement Learning](https://arxiv.org/html/2410.22766v1)
 - [3] [andywu](https://github.com/andywu0913/OpenAI-GYM-CarRacing-DQN)
 - [4] [PyTorch](https://pytorch.org/)
 - [5] [Gymnasium](https://gymnasium.farama.org/)
