@@ -174,7 +174,7 @@ All configurations where ran on a Desktop PC, with 32 GB of RAM, a GTX 1070 (ple
 
 The plot above shows the mean returns (over all 3 seeds) vs. episodes of all 4 variants. Double DQN with RGB clearly dominates all other strategies. DQN with RGB ending second, DQN with grayscale third and Double DQN with grayscale with a significant difference last.
 
-### 5.1 Mean rolling returns over all seeds across all 4 variants seperate
+### 5.2 Mean rolling returns over all seeds across all 4 variants seperate
 
 <!-- markdownlint-disable MD033 -->
 <table>
