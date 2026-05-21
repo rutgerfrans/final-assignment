@@ -239,13 +239,13 @@ The previous result gave me another question to think about. Why, if the results
 
 So in the end I tried to find out what is about people choosing grayscaling over RGB. I think in general the preference holds, but not necessaraly in cases like this car racing environment. Such cases are easy enough for which staying at an RGB setup would not matter too much. Even better, it will return higher more consistent and stable results over the same amount of episodes with only a delay of ~10 minutes.
 
-### 7.1 What did I learn?
-
-Lastly, I thought this was a very fun project overall. I finally learned about how does damn 2d cars drive around on a simple course. I learned how DQNs and Double-DQNs are implemented. And above all I got a good understanding of what it means to preprocess images for such a network with regards to color!
-
 So to get back at my "more specific" question: "Is color really not that important for this type of game? and whatever the outcome is, why?"
 
 In this environment it is not that important, both RGB and grayscaling will learn the car to drive. Only RGB in combination with Double-DQN will result in the highest and most stable returns within 1000 episodes.
+
+### 7.1 What did I learn?
+
+Lastly, I thought this was a very fun project overall. I finally learned about how does damn 2d cars drive around on a simple course. I learned how DQNs and Double-DQNs are implemented. And above all I got a good understanding of what it means to preprocess images for such a network with regards to color!
 
 ## 8. References
 
